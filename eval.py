@@ -18,7 +18,7 @@ import argparse
 import numpy as np
 import tensorflow as tf
 from resnet import resnet_v2
-from reg_model import five_regressors
+from models import five_regressors
 from load_images import create_batch_from_files
 slim = tf.contrib.slim
 
