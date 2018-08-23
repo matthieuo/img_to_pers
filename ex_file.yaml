@@ -1,0 +1,18 @@
+base-path: "/base/path"
+train-paths:
+  - ["img/path", "label/path"]
+
+test-paths: 
+  - test/path
+
+
+pre_train_path: '/path/to/file'
+
+fine-tune: 1
+debug: 0
+dropout: 1.0
+learning-rate: 0.001
+reg-factor: 0.001
+batch-size: 64
+max_steps: 300000
+append-string: app-str
