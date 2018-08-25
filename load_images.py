@@ -15,7 +15,9 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import pandas as pd
 import numpy as np
+
 import tensorflow as tf
 from resnet import inception_preprocessing
 
@@ -24,7 +26,7 @@ def read_labeled_image_list_jpeg(l_path_to_read, is_train=False, test_directorie
     filenames_path = []
     print("test path", test_directories)
     for dire, lab_file in l_path_to_read:
-        dir_list = os.listdir(dire)
+        
 
         if is_train:
             for root, _, files in os.walk(dire, topdown=False):
@@ -36,12 +38,31 @@ def read_labeled_image_list_jpeg(l_path_to_read, is_train=False, test_directorie
                                    if os.path.basename(root) in test_directories]
 
         #print(filenames_path)
+        dir_list = os.listdir(dire)
         dir_list = sorted(
             dir_list,
             key=lambda d: d.lower().replace("_", "+"))
 
         print(dir_list)
-        data = np.loadtxt(lab_file, delimiter=";")
+        data_load = np.loadtxt(lab_file, delimiter=";")
+
+        #using pandas discretize the labels (1 first quartil, 3 last, 2 medium)
+
+        df = pd.DataFrame(data_load)
+        data_cat = df.apply(
+            lambda x: pd.qcut(
+                x,
+                4,
+                labels=[0, 11, 12, 2]))
+
+        #print(data_cat.describe())
+        #data_cat = data_cat.replace(['11','12'], 2)
+        data = data_cat.values.astype(np.int32)
+        data[data == 11] = 1
+        data[data == 12] = 1
+        
+        print(data)
+        
         print("Labels generation done", len(dir_list), len(data))
         assert len(dir_list) == len(data), "The two len must be equals"
 
@@ -49,13 +70,14 @@ def read_labeled_image_list_jpeg(l_path_to_read, is_train=False, test_directorie
 
         #print([os.path.basename(os.path.dirname(f)) for f in filenames_path])
         #now each file should be associated with a label
+        #filenames_path = filenames_path[:200]
         labels = [di[os.path.basename(os.path.dirname(f))]
                   for f in filenames_path]
 
         labels = np.asarray(labels)
 
-        #print(filenames_path[180])
-        #print(labels[180])
+        print(filenames_path[0])
+        print(labels[0])
         print(len(labels), len(filenames_path))
 
     return filenames_path, labels
@@ -102,7 +124,7 @@ def create_batch_from_files(l_data_path,
         training,
         dir_test)
 
-    label_list = tf.convert_to_tensor(label_list, dtype=tf.float32)
+    label_list = tf.convert_to_tensor(label_list, dtype=tf.int32)
 
     #if training:
     input_queue = tf.train.slice_input_producer(

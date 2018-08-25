@@ -25,7 +25,7 @@ from datetime import datetime
 import tensorflow as tf
 
 from resnet import resnet_v2
-from models import five_regressors
+from models import five_classifiers
 
 
 from load_images import create_batch_from_files
@@ -81,17 +81,18 @@ def train_model(hyperparams,
             global_pool=True,
             spatial_squeeze=True)
 
-    with tf.variable_scope('five_regressors'):
-        regressor_loss, _, _, _ = five_regressors.five_regressors_loss(
+    with tf.variable_scope('five_classifiers'):
+        classifs_loss, l_cl = five_classifiers.five_classifiers_loss(
             out_resnet,
             label_batch,
             tf.contrib.layers.l2_regularizer(
                 hyperparams['reg_fact'],
                 scope=None))
+        classifs_loss = tf.add_n(classifs_loss)
+        
+    train_vars_scope = ['five_classifiers']
 
-    train_vars_scope = ['five_regressors']
-
-    exc_var_load = [scope.strip() for scope in ['five_regressors']]
+    exc_var_load = [scope.strip() for scope in ['five_classifiers']]
 
     if tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES):
         if fine_tune:
@@ -118,12 +119,29 @@ def train_model(hyperparams,
         regulation_losses = 0.0
 
 
-    # global loss with the MSE and the L2 reg
-    loss = regulation_losses + regressor_loss
+    loss = regulation_losses + classifs_loss
+    print(loss)
 
     # tf.summary.scalar("acc_class", accuracy_class)
-    tf.summary.scalar("regressor_loss", regressor_loss)
-    tf.summary.scalar("total loss", loss)
+    tf.summary.scalar("classifs_loss", tf.reduce_mean(classifs_loss))
+
+    l_label = tf.split(label_batch, 5, 1)
+    
+    l_correct_prediction = [tf.equal(
+        tf.cast(
+            tf.argmax(
+                cl,
+                1),
+            tf.int32),
+        l)
+                            for cl, l in zip(l_cl, l_label)]
+
+    
+    l_accuracy_class = [tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) for correct_prediction in l_correct_prediction]
+
+    [tf.summary.scalar("acc_class"+n, ac) for n, ac in zip(['O', 'C', 'E', 'A', 'N'], l_accuracy_class)]
+    
+    tf.summary.scalar("total loss", tf.reduce_mean(loss))
 
     if not pre_train_path:
         print("No existing model loaded, training from scratch")
@@ -224,10 +242,11 @@ def train_model(hyperparams,
 
                     print("wrote sumary op")
 
-                    sum_op, regr_loss, tot_loss = sess.run(
-                        [summary_op, regressor_loss, loss])
+                    sum_op, cls_loss, tot_loss, l_a = sess.run(
+                        [summary_op, classifs_loss, loss, l_accuracy_class])
 
-                    print("regr_loss = ", regr_loss, "tot_loss = ", tot_loss)
+                    print("cl_loss = ", cls_loss, "tot_loss = ", tot_loss)
+                    print("l_acc = ", l_a)
 
                     summary_writer.add_summary(sum_op, step)
 
