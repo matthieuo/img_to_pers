@@ -21,7 +21,8 @@ import time
 import yaml
 import shutil
 from datetime import datetime
-
+from sklearn.metrics import classification_report
+import numpy as np
 import tensorflow as tf
 
 from resnet import resnet_v2
@@ -126,6 +127,11 @@ def train_model(hyperparams,
     tf.summary.scalar("classifs_loss", tf.reduce_mean(classifs_loss))
 
     l_label = tf.split(label_batch, 5, 1)
+
+    print("Size label ", len(l_label), l_label[1], l_cl[1])
+
+
+    #print(tf.equal(tf.cast(tf.argmax(l_cl[1], 1),tf.int32), tf.squeeze(l_label[1])))
     
     l_correct_prediction = [tf.equal(
         tf.cast(
@@ -133,13 +139,21 @@ def train_model(hyperparams,
                 cl,
                 1),
             tf.int32),
-        l)
+        tf.squeeze(l))
                             for cl, l in zip(l_cl, l_label)]
 
+
+    print("lcopr[1], ", l_correct_prediction[1])
     
     l_accuracy_class = [tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) for correct_prediction in l_correct_prediction]
 
-    [tf.summary.scalar("acc_class"+n, ac) for n, ac in zip(['O', 'C', 'E', 'A', 'N'], l_accuracy_class)]
+    [tf.summary.scalar("train_acu/" + n, ac) for n, ac in zip(['O', 'C', 'E', 'A', 'N'], l_accuracy_class)]
+
+
+    l_ap = [tf.metrics.auc(tf.squeeze(l), tf.argmax(pred, 1)) for pred, l in zip(l_cl, l_label)]
+
+       
+    [tf.summary.scalar("train_AP/" + n, ap[0]) for n, ap in zip(['O', 'C', 'E', 'A', 'N'], l_ap)]
     
     tf.summary.scalar("total loss", tf.reduce_mean(loss))
 
@@ -242,12 +256,24 @@ def train_model(hyperparams,
 
                     print("wrote sumary op")
 
-                    sum_op, cls_loss, tot_loss, l_a = sess.run(
-                        [summary_op, classifs_loss, loss, l_accuracy_class])
+                    sum_op, cls_loss, tot_loss, l_a, lb, llb, llcl, lcp = sess.run(
+                        [summary_op, classifs_loss, loss, l_accuracy_class, label_batch, l_label, l_cl, l_correct_prediction])
 
                     print("cl_loss = ", cls_loss, "tot_loss = ", tot_loss)
                     print("l_acc = ", l_a)
 
+
+                    
+                    #print("lb ", lb)
+                    #print("llcl ", llcl)
+                    #print("llb ", llb)
+                    #print("lcp ", lcp)
+
+                    for yt, yp in zip(llb, llcl):
+                        #print(yt.shape, np.argmax(yp, 1).shape)
+                        print(classification_report(yt, np.argmax(yp, 1)))
+
+                    
                     summary_writer.add_summary(sum_op, step)
 
                 if step % 1000 == 0 and step >= 0 and not debug_flag:
@@ -319,7 +345,7 @@ if __name__ == '__main__':
             print("****************** DEBUG MODE ********************")
 
         else:
-            output_dir = "reg_" + str(reg_fact)
+            output_dir = "class/reg_" + str(reg_fact)
             output_dir += "_dp_" + dp_str
             output_dir += "_bs_" + str(batch_size)
             output_dir += "_lr_" + str(learning_rate)

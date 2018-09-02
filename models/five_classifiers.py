@@ -18,10 +18,17 @@ import tensorflow as tf
 
 
 def n_classifiers(input_layer, regularizer, num_classifiers, class_per_classifier):
-    # v1 no hidden layer
+    # v0 no hidden layer 
+    # v1 one hidden layer 2048
+    
     # Dense Layer
     input_flat = tf.layers.Flatten()(input_layer)
     print(input_flat)
+
+    #h1 = tf.layers.dense(inputs=input_flat,
+    #                     units=2048,
+    #                     activation=tf.nn.relu,
+    #                     kernel_regularizer=regularizer)
 
     cls = [tf.layers.dense(inputs=input_flat,
                            units=class_per_classifier,
@@ -40,10 +47,13 @@ def n_classifiers_loss(cls, labels):
     l_label = tf.split(labels, 5, 1)
     print("L_label = ", l_label)
     assert len(l_label) == len(cls), "The two len must be equal"
+
+    def f_weights(x): return tf.multiply(-0.5, tf.cast(tf.equal(x, 1), tf.float32)) + 1
+
     losses = [tf.losses.sparse_softmax_cross_entropy(
         logits=cl,
-        labels=l)
-        #weights=tf.tensor([2.0, 1.0, 2.0]))
+        labels=tf.squeeze(l),
+        weights=f_weights(l))
               for cl, l in zip(cls, l_label)]
 
     print("Losses : ", losses)

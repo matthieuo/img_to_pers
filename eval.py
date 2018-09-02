@@ -17,8 +17,10 @@
 import argparse
 import numpy as np
 import tensorflow as tf
+from sklearn.metrics import classification_report
+
 from resnet import resnet_v2
-from models import five_regressors
+from models import five_classifiers
 from load_images import create_batch_from_files
 slim = tf.contrib.slim
 
@@ -49,21 +51,40 @@ def test_model(data_path,
             global_pool=True,
             spatial_squeeze=True)
 
-    with tf.variable_scope('five_regressors'):
-        regressor_loss, rg_no_sum, _, ro = five_regressors.five_regressors_loss(
+    with tf.variable_scope('five_classifiers'):
+        classifs_loss, l_cl = five_classifiers.five_classifiers_loss(
             out_resnet,
             label_batch,
             None)
-  
-    tf.summary.scalar("MSE", regressor_loss)
-    tf.summary.scalar("RMSE", tf.sqrt(regressor_loss))
 
-    tf.summary.tensor_summary("MSE", rg_no_sum)
-    tf.summary.histogram("MSE", rg_no_sum)
+    l_label = tf.split(label_batch, 5, 1)
+    
+    l_correct_prediction = [tf.equal(
+        tf.cast(
+            tf.argmax(
+                cl,
+                1),
+            tf.int32),
+        tf.squeeze(l))
+                            for cl, l in zip(l_cl, l_label)]
+    
+    l_accuracy_class = [tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) for correct_prediction in l_correct_prediction]
+
+    [tf.summary.scalar("test_acu/" + n, ac) for n, ac in zip(['O', 'C', 'E', 'A', 'N'], l_accuracy_class)]
+
+
+
+    l_ap = [tf.metrics.auc(tf.squeeze(l), tf.argmax(pred, 1)) for pred, l in zip(l_cl, l_label)]
+
+       
+    [tf.summary.scalar("test_AP/" + n, ap[0]) for n, ap in zip(['O', 'C', 'E', 'A', 'N'], l_ap)]
+
+    
 
     saver = tf.train.Saver()
 
-    init_op = tf.global_variables_initializer()
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer())
 
     summary_op = tf.summary.merge_all()
 
@@ -83,17 +104,12 @@ def test_model(data_path,
         print(chk_step)
         saver.restore(sess, last_chk)
 
-        lb, loss_v, loss_v_ns, sum_op, r_out = sess.run(
-            [label_batch, regressor_loss, rg_no_sum, summary_op, ro])
+        lb, sum_op, llb, llcl = sess.run(
+            [label_batch, summary_op, l_label, l_cl])
 
-        print("Mean result", np.mean(r_out, axis=0))
-        print("Objective ", lb)
-        
-        print("nosum ", np.mean(loss_v_ns, axis=0))
-        print("nosum sq ", np.sqrt(np.mean(loss_v_ns, axis=0)))
-        print("MSE : ", loss_v)
-        print("RMSE : ", np.sqrt(loss_v))
-
+        for yt, yp in zip(llb, llcl):
+            #print(yt.shape, np.argmax(yp, 1).shape)
+            print(classification_report(yt, np.argmax(yp, 1)))
 
         summary_writer.add_summary(sum_op, chk_step)
         

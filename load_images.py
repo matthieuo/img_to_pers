@@ -70,7 +70,7 @@ def read_labeled_image_list_jpeg(l_path_to_read, is_train=False, test_directorie
 
         #print([os.path.basename(os.path.dirname(f)) for f in filenames_path])
         #now each file should be associated with a label
-        #filenames_path = filenames_path[:200]
+        #filenames_path = filenames_path[:1000]
         labels = [di[os.path.basename(os.path.dirname(f))]
                   for f in filenames_path]
 
@@ -87,11 +87,11 @@ def file_operations_eval(tensor_string):
     image_file = tf.read_file(tensor_string)
     image = tf.image.decode_jpeg(image_file, channels=3)
 
-    image = inception_preprocessing.preprocess_for_eval(
+    image = inception_preprocessing.preprocess_image(
         image,
         299,
         299,
-        central_fraction=None)
+        is_training=False)
     return image
 
 
@@ -99,15 +99,11 @@ def file_operations_train(tensor_string):
     image_file = tf.read_file(tensor_string)
     image = tf.image.decode_jpeg(image_file, channels=3)
 
-    image = inception_preprocessing.preprocess_for_train(
+    image = inception_preprocessing.preprocess_image(
         image,
         299,
         299,
-        None,
-        min_object_covered=0.88,
-        aspect_ratio_range=(0.7, 1.4),
-        area_range=(0.05, 1.0),
-        fast_mode=True)
+        is_training=True)
     return image
 
 
