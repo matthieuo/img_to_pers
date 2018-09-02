@@ -226,8 +226,8 @@ def preprocess_for_train(image, height, width, bbox,
     # Randomly flip the image horizontally.
 
 
-
-    image = tf.expand_dims(image, 0)
+    print(image)
+    #image = tf.expand_dims(image, 0)
     image = tf.image.resize_images(image, [height, width],
                                    preserve_aspect_ratio=True,
                                    align_corners=False)
@@ -247,6 +247,8 @@ def preprocess_for_train(image, height, width, bbox,
                        tf.expand_dims(distorted_image, 0))
     distorted_image = tf.subtract(distorted_image, 0.5)
     distorted_image = tf.multiply(distorted_image, 2.0)
+
+    print(distorted_image)
     return distorted_image
 
 
